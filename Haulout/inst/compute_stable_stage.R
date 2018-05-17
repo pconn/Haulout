@@ -205,7 +205,7 @@ dev.off()
 #  then produce predictions at solar noon and adjust with stable stage distributions to compare
 ####################
 
-load("HO_df.RData")  #from process_haulout_data3.R
+load("HO_df.RData")  #from process_haulout_data4.R
 library(glmmLDTS)
 
 HO_ribbon = HO_df[HO_df$species=="Hf",]

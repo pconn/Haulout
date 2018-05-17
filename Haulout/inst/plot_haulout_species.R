@@ -2,39 +2,6 @@
 library(mgcv)  #for predictions of Northing variable over time
 expit<-function(x)1/(1+exp(-x))
 
-###########################################
-#load environmental data for annual predictions
-##############################################
-install_pkg <- function(x)
-{
-  if (!require(x,character.only = TRUE))
-  {
-    install.packages(x,dep=TRUE)
-    if(!require(x,character.only = TRUE)) stop("Package not found")
-  }
-}
-
-# Install libraries ----------------------------------------------
-install_pkg("RPostgreSQL")
-install_pkg("sf")
-
-# Run code -------------------------------------------------------
-# Extract data from DB ------------------------------------------------------------------
-con <- RPostgreSQL::dbConnect(PostgreSQL(), 
-                              dbname = Sys.getenv("pep_db"), 
-                              host = Sys.getenv("pep_ip"), 
-                              user = Sys.getenv("pep_user"), 
-                              rstudioapi::askForPassword(paste("Enter your DB password for user account: ", Sys.getenv("pep_user"), sep = "")))
-
-qry <- "WITH a AS
-(SELECT id, cell, ST_Transform(ST_Centroid(geom), 3338) as centroid
-  FROM base.geo_analysis_grid)
-SELECT a.*, lower(fdatetime_range), ST_Value(rast, centroid)
-FROM a, environ.tbl_narr_acpcp
-WHERE lower(fdatetime_range)::date >= '2012-04-10' AND lower(fdatetime_range)::date <= '2012-05-31'"
-acpcp <- sf::st_read_db(con, query=qry, geom_column="centroid") 
-
-
 
 ###############################
 #  Ribbon seals
@@ -57,8 +24,8 @@ FE = test.ribbon$fixed.effects
 # Plot 1
 # HO probability for each species by day of year and time of day
 ######################################
-day.start = min(data$jday)
-day.end = max(data$jday)
+day.start = 60
+day.end = 181
 Day = (c(day.start:day.end)-120)/10
 Day2 = Day^2
 Day3 = Day^3
@@ -310,20 +277,20 @@ const.eff = FE[FE[,"effect"]=="intercept","estimate"] + FE[FE[,"levels"]==AS.vec
 
 YrDay = array(const.eff,dim=c(n_yrs,n_days))
 
-#pull down environmental covariates from database - use middle of Bering Sea for predictions
-#temporarily substitute w gams
+load("mean_covs_for_ho_yr_effects.Rdata") #load space-averaged environmental covariates 
 Pred.data = data.frame(day=Day,day2=Day2,day3=Day3,hour=rep(12,n_days))
 Temp.pred = Wind.pred = Baro.pred = matrix(0,n_yrs,n_days)
-gam.baro <- gam(pressure~s(day),data=data)
-gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
-gam.wind <- gam(wind~s(day),data=data)
-Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
-Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
-Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
-for(iy in 2:n_yrs){
-  Temp.pred[iy,]=Temp.pred[1,]
-  Baro.pred[iy,]=Baro.pred[1,]
-  Wind.pred[iy,]=Wind.pred[1,]
+#gam.baro <- gam(pressure~s(day),data=data)
+#gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
+#gam.wind <- gam(wind~s(day),data=data)
+#Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
+#Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
+#Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
+for(iy in 1:n_yrs){
+  Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
+  Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
+  Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
+  Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
 }
 
 ihr=12
@@ -332,8 +299,8 @@ for(iyr in 1:n_yrs){
   YrDay[iyr,iday]=YrDay[iyr,iday]+FE[FE[,"effect"]=="day","estimate"]*Day[iday]+
     FE[FE[,"effect"]=="day2","estimate"]*Day2[iday]+
     FE[FE[,"effect"]=="day3","estimate"]*Day3[iday]+
-    FE[FE[,"effect"]=="wind","estimate"]*Wind.pred[iday]+
-    FE[FE[,"effect"]=="pressure","estimate"]*Baro.pred[iday]+
+    FE[FE[,"effect"]=="wind","estimate"]*Wind.pred[iyr,iday]+
+    FE[FE[,"effect"]=="pressure","estimate"]*Baro.pred[iyr,iday]+
     FE[FE[,"effect"]=="sin1:day","estimate"]*Sin1[ihr]*Day[iday]+
     FE[FE[,"effect"]=="sin1:day2","estimate"]*Sin1[ihr]*Day2[iday]+
     #FE[FE[,"effect"]=="sin1:day3","estimate"]*Sin1[ihr]*Day3[iday]+
@@ -354,7 +321,7 @@ for(iyr in 1:n_yrs){
     #FE[FE[,"effect"]=="cos3:day3","estimate"]*Cos3[ihr]*Day3[iday]+     
     #FE[FE[,"effect"]=="day:temp2","estimate"]*mean.temp*Day[iday]+     
     #FE[FE[,"effect"]=="day2:temp2","estimate"]*mean.temp*Day2[iday]+     
-    FE[FE[,"effect"]=="temp2","estimate"]*Temp.mat[iday,ihr]+   
+    FE[FE[,"effect"]=="temp2","estimate"]*Temp.pred[iyr,iday]+   
     #FE[FE[,"effect"]=="temp2:wind","estimate"]*Temp.mat[iday,ihr]*Wind.pred[iday]+
     FE[FE[,"effect"]=="age.sex:day" & FE[,"levels"]==paste0("ADULT.F",','),"estimate"]*Day[iday]+
     FE[FE[,"effect"]=="age.sex:day2" & FE[,"levels"]==paste0("ADULT.F",','),"estimate"]*Day2[iday]+
@@ -720,20 +687,15 @@ const.eff = FE[FE[,"effect"]=="intercept","estimate"] + FE[FE[,"levels"]==AS.vec
 
 YrDay = array(const.eff,dim=c(n_yrs,n_days))
 
-#pull down environmental covariates from database - use middle of Bering Sea for predictions
+#spatially averaged environmental covariates 
 #temporarily substitute w gams
 Pred.data = data.frame(day=Day,day2=Day2,day3=Day3,hour=rep(12,n_days))
 Temp.pred = Wind.pred = Baro.pred = matrix(0,n_yrs,n_days)
-gam.baro <- gam(pressure~s(day),data=data)
-gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
-gam.wind <- gam(wind~s(day),data=data)
-Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
-Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
-Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
-for(iy in 2:n_yrs){
-  Temp.pred[iy,]=Temp.pred[1,]
-  Baro.pred[iy,]=Baro.pred[1,]
-  Wind.pred[iy,]=Wind.pred[1,]
+for(iy in 1:n_yrs){
+  Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
+  Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
+  Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
+  Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
 }
 
 ihr=12
@@ -742,8 +704,8 @@ for(iyr in 1:n_yrs){
     YrDay[iyr,iday]=YrDay[iyr,iday]+FE[FE[,"effect"]=="day","estimate"]*Day[iday]+
       FE[FE[,"effect"]=="day2","estimate"]*Day2[iday]+
       FE[FE[,"effect"]=="day3","estimate"]*Day3[iday]+
-      FE[FE[,"effect"]=="wind","estimate"]*Wind.pred[iday]+
-      FE[FE[,"effect"]=="pressure","estimate"]*Baro.pred[iday]+
+      FE[FE[,"effect"]=="wind","estimate"]*Wind.pred[iyr,iday]+
+      FE[FE[,"effect"]=="pressure","estimate"]*Baro.pred[iyr,iday]+
       FE[FE[,"effect"]=="sin1:day","estimate"]*Sin1[ihr]*Day[iday]+
       FE[FE[,"effect"]=="sin1:day2","estimate"]*Sin1[ihr]*Day2[iday]+
       #FE[FE[,"effect"]=="sin1:day3","estimate"]*Sin1[ihr]*Day3[iday]+
@@ -764,7 +726,7 @@ for(iyr in 1:n_yrs){
       #FE[FE[,"effect"]=="cos3:day3","estimate"]*Cos3[ihr]*Day3[iday]+     
       #FE[FE[,"effect"]=="day:temp2","estimate"]*mean.temp*Day[iday]+     
       #FE[FE[,"effect"]=="day2:temp2","estimate"]*mean.temp*Day2[iday]+     
-      FE[FE[,"effect"]=="temp2","estimate"]*Temp.mat[iday,ihr]+   
+      FE[FE[,"effect"]=="temp2","estimate"]*Temp.pred[iyr,iday]+   
       #FE[FE[,"effect"]=="temp2:wind","estimate"]*Temp.mat[iday,ihr]*Wind.pred[iday]+
       FE[FE[,"effect"]=="age.sex:day" & FE[,"levels"]==paste0("ADULT.F",','),"estimate"]*Day[iday]+
       FE[FE[,"effect"]=="age.sex:day2" & FE[,"levels"]==paste0("ADULT.F",','),"estimate"]*Day2[iday]+
@@ -778,23 +740,21 @@ library(reshape2)
 
 Plot.df=data.frame("Year"=rep(Yrs,n_days),"Day"=rep(c(day.start:day.end),each=n_yrs),"HO"=plogis(as.vector(YrDay)))
 
-
-HO_max_spotted = rep(0,n_yrs)
-for(iyr in 1:n_yrs){
-  Cur_dat = Plot.df[which(Plot.df$Year==Yrs[iyr]),]
-  HO_max_spotted[iyr] = Cur_dat[which(Cur_dat$HO==max(Cur_dat$HO)),"Day"]
-}
-HO_max_spotted[n_yrs-1]=171
-HO_max_spotted[n_yrs]=144
-#par(mfrow(c(1,1)))
-#plot(Sea_ice_Apr1[Yrs],HO_max_spotted)
-summary(lm(HO_max_spotted~Sea_ice_Apr1[Yrs]))
-
 for(iday in 1:(day.end-day.start+1)){
   for(iyr in 1:n_yrs){
     if(sum((data$jday-59)==iday & data$year==Yrs[iyr])==0)Plot.df[Plot.df$Day==(iday+59) & Plot.df$Year==Yrs[iyr],"HO"]=NA
   }
 }
+HO_max_spotted = rep(0,n_yrs)
+for(iyr in 1:n_yrs){
+  Cur_dat = Plot.df[which(Plot.df$Year==Yrs[iyr]),]
+  HO_max_spotted[iyr] = Cur_dat[which(Cur_dat$HO==max(Cur_dat$HO,na.rm=TRUE)),"Day"]
+}
+#par(mfrow(c(1,1)))
+#plot(Sea_ice_Apr1[Yrs],HO_max_spotted)
+summary(lm(HO_max_spotted~Sea_ice_Apr1[Yrs]))
+
+
 YrDay.plot = ggplot(Plot.df)+geom_line(aes(x=Day,y=HO,colour=Year),size=1.3) + xlab("Julian day") + ylab("Haul-out probability")+ theme(text=element_text(size=14))
 YrDay.plot
 
