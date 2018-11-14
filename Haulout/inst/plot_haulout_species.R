@@ -246,13 +246,15 @@ pressure.plot = ggplot()+geom_line(size=1.3,data=Plot.df,aes(x=Pressure,y=HOresp
 #temp.plot = temp.plot + geom_density(data=data,fill="gray",aes(x=temp*10))
 pressure.plot
 
-pdf("ribbon_pressure.pdf")
- pressure.plot
-dev.off()
+Pressure_ribbon = Plot.df
 
-jpeg("ribbon_pressure.jpg")
- pressure.plot
-dev.off()
+# pdf("ribbon_pressure.pdf")
+#  pressure.plot
+# dev.off()
+# 
+# jpeg("ribbon_pressure.jpg")
+#  pressure.plot
+# dev.off()
 
 ###############################################
 #  Plot 5: Year effect models
@@ -277,20 +279,23 @@ const.eff = FE[FE[,"effect"]=="intercept","estimate"] + FE[FE[,"levels"]==AS.vec
 
 YrDay = array(const.eff,dim=c(n_yrs,n_days))
 
-load("mean_covs_for_ho_yr_effects.Rdata") #load space-averaged environmental covariates 
+#load("mean_covs_for_ho_yr_effects.Rdata") #load space-averaged environmental covariates 
 Pred.data = data.frame(day=Day,day2=Day2,day3=Day3,hour=rep(12,n_days))
 Temp.pred = Wind.pred = Baro.pred = matrix(0,n_yrs,n_days)
-#gam.baro <- gam(pressure~s(day),data=data)
-#gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
-#gam.wind <- gam(wind~s(day),data=data)
-#Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
-#Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
-#Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
-for(iy in 1:n_yrs){
-  Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
-  Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
-  Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
-  Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
+gam.baro <- gam(pressure~s(day),data=data)
+gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
+gam.wind <- gam(wind~s(day),data=data)
+Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
+Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
+Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
+for(iy in 2:n_yrs){
+  Temp.pred[iy,]=Temp.pred[iy-1,]
+  Baro.pred[iy,]=Baro.pred[iy-1,]
+  Wind.pred[iy,]=Wind.pred[iy-1,]
+  #Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
+  #Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
+  #Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
+  #Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
 }
 
 ihr=12
@@ -333,6 +338,7 @@ for(iyr in 1:n_yrs){
 
 library(reshape2)
 
+#Yrs = Yrs[-11]
 Plot.df=data.frame("Year"=rep(Yrs,n_days),"Day"=rep(c(day.start:day.end),each=n_yrs),"HO"=plogis(as.vector(YrDay)))
 
 #determine julian day maximums
@@ -671,7 +677,8 @@ load("test_spotted_year.RData")  #model output list object - includes data set a
 data = test.spotted.year$dataset  
 FE = test.spotted.year$fixed.effects
 
-Yrs = unique(test.spotted.year$dataset$year)
+#Yrs = unique(test.spotted.year$dataset$year)  #out of order
+Yrs = factor(c(as.character(2006:2011),"2014","2016","2017"))
 n_yrs = length(Yrs)
 n_days = day.end-day.start+1
 AS.vec = c("SUB","ADULT.F","ADULT.M","YOY")
@@ -691,12 +698,22 @@ YrDay = array(const.eff,dim=c(n_yrs,n_days))
 #temporarily substitute w gams
 Pred.data = data.frame(day=Day,day2=Day2,day3=Day3,hour=rep(12,n_days))
 Temp.pred = Wind.pred = Baro.pred = matrix(0,n_yrs,n_days)
-for(iy in 1:n_yrs){
-  Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
-  Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
-  Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
-  Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
+gam.baro <- gam(pressure~s(day),data=data)
+gam.temp <- gam(temp2~s(day)+s(as.numeric(hour)),data=data)
+gam.wind <- gam(wind~s(day),data=data)
+Temp.pred[1,]=predict(gam.temp,newdata=Pred.data)
+Baro.pred[1,]=predict(gam.baro,newdata=Pred.data)
+Wind.pred[1,]=predict(gam.wind,newdata=Pred.data)
+for(iy in 2:n_yrs){
+  Temp.pred[iy,]=Temp.pred[iy-1,]
+  Baro.pred[iy,]=Baro.pred[iy-1,]
+  Wind.pred[iy,]=Wind.pred[iy-1,]
+  #Which.rows = which(Modeled_covs$year==as.numeric(as.character(Yrs[iy])))
+  #Temp.pred[iy,]=c(Modeled_covs[Which.rows,"temp2"],Modeled_covs[Which.rows[length(Which.rows)],"temp2"])  #1 day short on covariates
+  #Baro.pred[iy,]=c(Modeled_covs[Which.rows,"pressure"],Modeled_covs[Which.rows[length(Which.rows)],"pressure"])  #1 day short on covariates
+  #Wind.pred[iy,]=c(Modeled_covs[Which.rows,"wind"],Modeled_covs[Which.rows[length(Which.rows)],"wind"])  #1 day short on covariates
 }
+
 
 ihr=12
 for(iyr in 1:n_yrs){
@@ -959,6 +976,23 @@ temp.plot
 
 Temp.bearded = Plot.df
 
+######
+# pressure
+######
+Pressure = c(-50:47)
+n=length(Pressure)
+Xtemp = model.matrix(test.bearded$fixed.formula,data)
+P.col = which(colnames(Xtemp)=="pressure")
+HOresp = rep(0,n)
+Ests = FE$estimate
+Ests = Ests[-which(Ests==0)]
+for(i in 1:n){
+  Xtemp[,P.col]=Pressure[i]/100
+  HOresp[i]=mean(expit(Xtemp%*%Ests))
+}
+Plot.df = data.frame(Pressure=(Pressure*100+100000)/1000,HOresp=HOresp) # response in kPa
+pressure_bearded = Plot.df
+
 ###################### 
 #Northing by DOY plot
 ######################
@@ -1080,6 +1114,17 @@ jpeg("HO_temp.jpeg")
 Temp.plot
 dev.off()
 
+Pressure.all = rbind(pressure_bearded,Pressure_ribbon)
+Pressure.all$Species=c(rep("Bearded",nrow(pressure_bearded)),rep("Ribbon",nrow(Pressure_ribbon)))
+Pressure.plot = ggplot()+geom_line(size=1.3,data=Pressure.all,aes(x=Pressure,y=HOresp,linetype=Species))+xlab("Pressure at mean sea level (kPa)")+ylab("Haul-out probability")+theme(text=element_text(size=14),legend.key.width=unit(3,"line"))
+Pressure.plot
+pdf("HO_Pressure.pdf")
+Pressure.plot
+dev.off()
+
+jpeg("HO_Pressure.jpeg")
+Pressure.plot
+dev.off()
 
 
 

@@ -34,13 +34,17 @@ save(grid.sf,file="BOSS_grid_from_db.Rdata")
 
 ### figure out cells to get average weather data for the "Bering Sea"
 Coordinates = sf::st_coordinates(sf::st_centroid(grid.sf))
-Which.inc = which(Coordinates[,"X"]>-300000 & grid.sf$cell<15000)
+Which.inc = which(grid.sf$cell<15000)
+#Which.inc = which(Coordinates[,"X"]>-300000 & grid.sf$cell<15000)
 Cell.inc = grid.sf$cell[Which.inc]
 plot(grid.sf[Which.inc,])
-grid.wx.Bering <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM base.tbl_analysis_grid_cov_wx 
-                                   WHERE cell>11824 AND cell<14000")
-Which.inc.df = which(grid.wx.Bering$cell %in% Cell.inc)
-grid.wx.Bering = grid.wx.Bering[Which.inc.df,]
+#grid.wx.Bering <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM base.tbl_analysis_grid_cov_wx 
+#                                   WHERE cell>11824 AND cell<30542")
+Cell_char = paste(Cell.inc,collapse=",")
+Query_char = paste0("SELECT * FROM base.tbl_analysis_grid_cov_wx WHERE cell IN (",Cell_char,")")
+grid.wx.Bering <- RPostgreSQL::dbGetQuery(con, Query_char)
+#Which.inc.df = which(grid.wx.Bering$cell %in% Cell.inc)
+#grid.wx.Bering = grid.wx.Bering[Which.inc.df,]
 grid.wx.Bering$fdatetime_range_start=lubridate::with_tz(grid.wx.Bering$fdatetime_range_start,tz="UTC")
 Hour = lubridate::hour(grid.wx.Bering$fdatetime_range_start)
 #base on Hour = 23 UTC = 15 AKDST.  Convert to solar time later.

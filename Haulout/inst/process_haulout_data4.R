@@ -7,7 +7,7 @@ library(solaR)  #for getting hour of day in solar time
 library(splines)
 library(sf)
 
-load("Haulout_SpPtsDF_16May2018.RData")
+load("Haulout_SpPtsDF_1Nov2018.RData")
 
 pts_sp <- pts_sp[order(pts_sp@data[,"speno"],pts_sp@data[,"haulout_dt"]),]
 
@@ -20,6 +20,15 @@ pts_sp@data$jday = yday(pts_sp[["haulout_dt"]])
 
 #format and increment ages if necessary - need to do this before filtering so that pups tagged in fall don't
 #show up as pups in spring
+get_tag_year <- function(ID){
+  #different formatting constructs based on who did the tagging
+  if(nchar(ID)==14)yr=2000+as.numeric(substr(ID,3,4))
+  else{
+    if(substr(ID,1,4)=="KOTE")yr=2000+as.numeric(substr(ID,10,11))
+    else yr = as.numeric(substr(ID,3,6))
+  }
+  yr
+}
 #format ages into a few unique categories
 uniqueIDs <- unique(pts_sp[["speno"]])
 n.unique=length(uniqueIDs)
@@ -33,7 +42,7 @@ for(iid in 1:n.unique){
     CurDat[Which.later,"age"]="SUB"
   }
   #still some animals tagged as YOY previous year that first enter the dataset as subadults
-  tag.year = as.numeric(substr(uniqueIDs[iid],3,6))
+  tag.year = get_tag_year(uniqueIDs[iid])
   if(CurDat[1,"age"]=="YOY" & min(Years)>tag.year){
     CurDat[,"age"]="SUB"
   }
@@ -85,6 +94,9 @@ dev.off()
 
 #formulate "age.sex" covariate - 'yoy', 'sub', 'adult f', 'adult m'
 #also, we have trouble estimating age.sex * DOY interaction for YOY so set YOY = ADULT.F for estimation of interactions
+pts_sp@data[which(pts_sp[["sex"]]=="female"),"sex"]="F"
+pts_sp@data[which(pts_sp[["sex"]]=="male"),"sex"]="M"
+
 pts_sp@data[,"age.sex"]='YOY'
 pts_sp@data[which(pts_sp[["age"]]=="SUB"),"age.sex"]="SUB"
 pts_sp@data[which(pts_sp[["age"]]=="ADT" & pts_sp[["sex"]]=="M"),"age.sex"]="ADULT.M"
@@ -120,13 +132,13 @@ Summary=summaryBy(percent_dry~species+year+month+age.sex,data=pts_sp@data,FUN=le
 
 #summaryBy(sex~year+species,data=DF.unique,FUN=length)
 
-Year = as.character(c(2005:2016))
+Year = as.character(c(2005:2017))
 Month = as.character(c(3:6))
 Species = c("Eb","Hf","Pl")
 Age.sex = c("YOY","SUB","ADULT.F","ADULT.M")
 #plot number of seals and hourly records by species, year, and month
-Sum.table = matrix(0,12*5,12)
-for(iyear in 1:12){
+Sum.table = matrix(0,13*5,12)
+for(iyear in 1:13){
   for(imonth in 1:4){
     for(isp in 1:3){
       for(iage in 1:4){
@@ -149,8 +161,8 @@ pts_sp@data$IDyear = paste(pts_sp[["speno"]],pts_sp[["year"]])
 NoDupe=pts_sp@data
 if(length(which(duplicated(pts_sp@data[,"IDyear"])==0))>0)NoDupe = pts_sp@data[which(duplicated(pts_sp@data[,"IDyear"])==0),]
 Summary=summaryBy(IDyear~species+year+age.sex,data=NoDupe,FUN=length)
-Sum.table = matrix(0,12,12)
-for(iyear in 1:12){
+Sum.table = matrix(0,13,12)
+for(iyear in 1:13){
   for(isp in 1:3){
     for(iage in 1:4){
       cur.records = 0
@@ -344,6 +356,7 @@ test.ribbon <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos
 save(test.ribbon,file="test_ribbon.RData")
 
 HO_spotted = HO_df[HO_df$species=="Pl",]
+HO_spotted = HO_spotted[-which(HO_spotted$year=="2012"),]  #get rid of 2012 - only 1 seal and it causes numerical problems if included
 test.spotted <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + temp2 + wind + pressure + precip + wind*temp2 +
                           sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
                           sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2 + 
@@ -389,7 +402,6 @@ test.ribbon.year <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 
 save(test.ribbon.year,file="test_ribbon_year.RData")
 
 
-HO_spotted = HO_spotted[-which(HO_spotted$year=="2012"),]  #get rid of 2012 - only 1 seal and it causes numerical problems if included
 HO_spotted$year = factor(HO_spotted$year)  #get rid of years w/o data
 test.spotted.year <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + temp2 + wind + pressure + 
                                sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
@@ -404,3 +416,110 @@ test.spotted.year <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2
                              group.vec = "AR1.ID")
 
 save(test.spotted.year,file="test_spotted_year.RData")
+
+#note year effects are going to be confounded with age-class since e.g. YOY are the only age class in 2005.
+# HO_bearded$year = factor(HO_bearded$year)  
+# test.bearded.year <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + temp2 + wind + pressure + 
+#                                sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+#                                sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2 +   
+#                                 year:day + year:day2,
+#                              random.formula = Dry ~ speno,
+#                              data = HO_bearded,
+#                              EstMeth="REML",
+#                              timecol = "time", 
+#                              #ridge.reg = "global",
+#                              #lambda = 0.5,
+#                              group.vec = "AR1.ID")
+# 
+# save(test.bearded.year,file="test_bearded_year.RData")
+
+
+#run models without weather or spatial effects for Okhotsk haul-out predictions
+
+test.ribbon.nowx <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + 
+                          sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                          sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2 +   
+                          age.sex:day + age.sex:day2 + age.sex:day3,
+                        random.formula = Dry ~ speno,
+                        data = HO_ribbon,
+                        EstMeth="REML",
+                        timecol = "time", 
+                        #ridge.reg = "global",
+                        #lambda = 0.5,
+                        group.vec = "AR1.ID")
+
+save(test.ribbon.nowx,file="test_ribbon_nowx.RData")
+
+test.spotted.nowx <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 +
+                           sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                           sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2 + 
+                           age.sex:day + age.sex:day2 + age.sex:day3,
+                         random.formula = Dry ~ speno,
+                         data = HO_spotted,
+                         EstMeth="REML",
+                         timecol = "time", 
+                         #ridge.reg = "global",
+                         #lambda = 0.5,
+                         group.vec = "AR1.ID")
+save(test.spotted.nowx,file="test_spotted_nowx.RData")
+
+test.bearded.nowx <- glmmLDTS(fixed.formula = Dry ~ age.sex + sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + 
+                           sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                           sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2+
+                           Northing + Northing*day + Northing*day2,
+                         random.formula = Dry ~ speno,
+                         data = HO_bearded,
+                         EstMeth="REML", #"ML",  #REML was default
+                         timecol = "time", 
+                         #ridge.reg = "global",
+                         #lambda = 0.5,
+                         group.vec = "AR1.ID")
+save(test.bearded.nowx,file="test_bearded_nowx.RData")
+
+
+#JUST use day-of-year, time-of-day
+bearded.simple <- glmmLDTS(fixed.formula = Dry ~ sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + 
+                                sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                                sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2,
+                              random.formula = Dry ~ speno,
+                              data = HO_bearded,
+                              EstMeth="REML", #"ML",  #REML was default
+                              timecol = "time", 
+                              #ridge.reg = "global",
+                              #lambda = 0.5,
+                              group.vec = "AR1.ID")
+
+spotted.simple <- glmmLDTS(fixed.formula = Dry ~ sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + 
+                          sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                          sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2,
+                        random.formula = Dry ~ speno,
+                        data = HO_spotted,
+                        EstMeth="REML", #"ML",  #REML was default
+                        timecol = "time", 
+                        #ridge.reg = "global",
+                        #lambda = 0.5,
+                        group.vec = "AR1.ID")
+
+ribbon.simple <- glmmLDTS(fixed.formula = Dry ~ sin1 + cos1 + sin2 + cos2 + sin3 + cos3 + day + day2+ day3 + 
+                          sin1*day + cos1*day + sin2*day + cos2*day + sin3*day + cos3*day +
+                          sin1*day2 + cos1*day2 + sin2*day2 + cos2*day2 + sin3*day2 + cos3*day2,
+                        random.formula = Dry ~ speno,
+                        data = HO_ribbon,
+                        EstMeth="REML", #"ML",  #REML was default
+                        timecol = "time", 
+                        #ridge.reg = "global",
+                        #lambda = 0.5,
+                        group.vec = "AR1.ID")
+
+
+load('c:/users/paul.conn/git/BOSS/JayPowerR/glmmLDTS.bearded.fit.RDa')
+max(glmmLDTS.bearded.fit$fit.table$mu)
+
+load('c:/users/paul.conn/git/BOSS/JayPowerR/glmmLDTS.spotted.fit.RDa')
+max(glmmLDTS.spotted.fit$fit.table$mu)
+
+load('c:/users/paul.conn/git/BOSS/JayPowerR/glmmLDTS.ribbon.fit.RDa')
+max(glmmLDTS.ribbon.fit$fit.table$mu)
+
+
+
