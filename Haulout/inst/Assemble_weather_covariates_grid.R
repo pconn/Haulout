@@ -75,7 +75,7 @@ for(i in 1:n.unique){
 Modeled_covs = data.frame(year = Mean_covs$Year,day=Mean_covs$Day,pressure=(Mean_covs$rast_prmsl-100000)/10000,
                           precip = Mean_covs$rast_acpcp, temp2=(Mean_covs$rast_air2m-270)/27, 
                           wind = sqrt(Mean_covs$rast_uwnd^2+Mean_covs$rast_vwnd^2)/10)
-save(Modeled_covs,file="mean_covs_for_ho_yr_effects.Rdata")
+save(Modeled_covs,file="mean_covs_for_ho_yr_effects_15Apr2019.Rdata")
 
 ### BOSS covariate query
 
@@ -85,7 +85,7 @@ grid.wx <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM base.tbl_analysis_grid_co
 grid.wx.modeled = data.frame(cell=grid.wx$cell,dt_UTC = grid.wx$fdatetime_range_start,pressure=(grid.wx$rast_prmsl-100000)/10000,
                           precip = grid.wx$rast_acpcp, temp2=(grid.wx$rast_air2m-270)/27, 
                           wind = sqrt(grid.wx$rast_uwnd^2+grid.wx$rast_vwnd^2)/10)
-save(grid.wx.modeled,file="BOSS_weather_covs.RData")
+save(grid.wx.modeled,file="BOSS_weather_covs_15Apr2019.RData")
 #grid.wx2 <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM base.tbl_analysis_grid_cov_wx LIMIT 10000")
 #grid.seaice <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM base.tbl_analysis_grid_cov_seaice --LIMIT 100")
 

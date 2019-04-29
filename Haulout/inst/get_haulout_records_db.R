@@ -63,5 +63,5 @@ my.plot
 
 # change to spatial points for prior compatibility
 pts_sp <- dat.sf %>% as("Spatial")
-save(pts_sp,file = "Haulout_SpPtsDF_1Nov2018.RData")
+save(pts_sp,file = "Haulout_SpPtsDF_15Apr2019.RData")
 

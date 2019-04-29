@@ -4,7 +4,7 @@ The following scripts were used to process, analyze, and plot haul-out data.  Se
 
 -get_haulout_records_db.R: Took data from database, did some minimal filtering based on dates, animals missing covariates, etc.
 It produces a spatial points data frame with weather covariates attached to hourly haul-out records
-("Haulout_SpPtsDF_16May2018.RData")
+("Haulout_SpPtsDF_15Apr2019.RData")
 
 -Assemble_weather_covariates_grid.R:  This also pulls data from the database.  This script pulls covariates from the larger BOSS/CHESS grid
 at 3 hour intervals and summarizes them for haulout predictions.  For the haul-out paper, the relevant data produced are "mean_covs_for_ho_yr_effects.Rdata"

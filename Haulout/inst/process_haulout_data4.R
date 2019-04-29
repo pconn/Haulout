@@ -7,7 +7,7 @@ library(solaR)  #for getting hour of day in solar time
 library(splines)
 library(sf)
 
-load("Haulout_SpPtsDF_1Nov2018.RData")
+load("Haulout_SpPtsDF_15Apr2019.RData")
 
 pts_sp <- pts_sp[order(pts_sp@data[,"speno"],pts_sp@data[,"haulout_dt"]),]
 
